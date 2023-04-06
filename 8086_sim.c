@@ -19,7 +19,6 @@ M - Reg/Mem
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#define INSTRUCTION_LENGTH 2
 
 typedef unsigned char u8;
 typedef unsigned short u16;
@@ -28,40 +27,37 @@ typedef unsigned short u16;
 u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem;
 
 // Registers (Name Conflict)
-// u16 AX, BX, CX, DX;
-// u8 SI, DI, BP, SP;
+// u16 AX_var, BX_var, CX_var, DX_var;
+// u8 SI_var, DI_var, BP_var, SP_var;
 
 // Register Strings
 u8* regStrings[16] = {"ax\0", "cx\0", "dx\0", "bx\0", "sp\0", "bp\0", "si\0", "di\0", "al\0", "cl\0", "dl\0", "bl\0", "ah\0", "ch\0", "dh\0", "bh\0"};
 
 // Enums
-enum directions {RIGHT_TO_LEFT, LEFT_TO_RIGHT};
+enum directions {REG_SOURCE, REG_DEST};
 enum wordByte {BYTE, WORD};
+enum modes {MODE_MEM_NO_DISP, MODE_MEM_8_DISP, MODE_MEM_16_DISP, MODE_REG};
 enum registers {AX, CX, DX, BX, SP, BP, SI, DI};
 
 // Globals
 char ASMOutputBuffer[128];
 
-void binPrint(u8 dataByte, int printLength) {
+const char* binPrint(u8 dataByte, int printLength) {
+	char binaryString[printLength+1];
 	for (int i=printLength-1; i>=0; i--) {
-		putchar(((dataByte >> i) & 1) == 1 ? '1' : '0');
+		binaryString[i] = ((dataByte >> i) & 1) == 1 ? '1' : '0';
 	}
+	char* returnString = (char*)binaryString;
+	return returnString;
 }
 
 void printDecoded() {
-	printf("OPCODE: \033[32m");
-	binPrint(opcode, 6);
-	printf("\033[0m  DIRECTION: \033[32m");
-	binPrint(directionFlag, 1);
-	printf("\033[0m  WORD/BYTE: \033[32m");
-	binPrint(wordByteFlag, 1);
-	printf("\033[0m  MODE: \033[32m");
-	binPrint(mode, 2);
-	printf("\033[0m  REG: \033[32m");
-	binPrint(reg, 3);
-	printf("\033[0m  R/M: \033[32m");
-	binPrint(regMem, 3);
-	printf("\033[0m\n");
+	printf("OPCODE: \033[32m%s\033[0m  ", binPrint(opcode, 6));
+	printf("DIRECTION: \033[32m%s\033[0m  ", binPrint(directionFlag, 1));
+	printf("WORD/BYTE: \033[32m%s\033[0m  ", binPrint(wordByteFlag, 1));
+	printf("MODE: \033[32m%s\033[0m  ", binPrint(mode, 2));
+	printf("REG: \033[32m%s\033[0m  ", binPrint(reg, 3));
+	printf("R/M: \033[32m%s\033[0m\n", binPrint(regMem, 3));
 }
 
 void decodeInstructionStream(u8 *binaryStream, int byteAddress) {
@@ -74,19 +70,20 @@ void decodeInstructionStream(u8 *binaryStream, int byteAddress) {
 }
 
 void MOV(FILE* file) {
-	if (directionFlag == RIGHT_TO_LEFT) {
+	if (directionFlag == REG_SOURCE) {
 		switch (wordByteFlag) {
 			case BYTE:
-				fprintf(file, "mov %s, %s\n", regStrings[regMem+8], regStrings[reg+8]);
+				switch (mode) {
+					case MODE_REG:
+						fprintf(file, "mov %s, %s\n", regStrings[regMem+8], regStrings[reg+8]);
+						break;
+				}
 				break;
 			case WORD:
 				fprintf(file, "mov %s, %s\n", regStrings[regMem], regStrings[reg]);
 				break;
 		}
-		if (wordByteFlag == BYTE) {
-		} else if (wordByteFlag == WORD) {
-		}
-	} else if (directionFlag == LEFT_TO_RIGHT) {
+	} else if (directionFlag == REG_DEST) {
 		// Reverse direction
 	}
 }
