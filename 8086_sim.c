@@ -78,11 +78,9 @@ void MOV(FILE* file) {
 		switch (wordByteFlag) {
 			case BYTE:
 				fprintf(file, "mov %s, %s\n", regStrings[regMem+8], regStrings[reg+8]);
-				printDecoded();
 				break;
 			case WORD:
 				fprintf(file, "mov %s, %s\n", regStrings[regMem], regStrings[reg]);
-				printDecoded();
 				break;
 		}
 		if (wordByteFlag == BYTE) {

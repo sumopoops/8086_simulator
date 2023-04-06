@@ -1,6 +1,7 @@
 data/
 8086_manual.pdf
 8086_decode.exe
+8086_sim.exe
 build_and_run.bat
 todo.md
 8086_decode_linux
