@@ -1,21 +1,3 @@
-/*
-
---================ 8086 Instruction ================--
-
-Byte 1
-OOOOOO D W
-O - Opcode
-D - Direction, 0 REG = Source, 1 REG = Destination
-W - 0 = 8bit byte, 1 = 16bit word
-
-Byte 2
-MM RRR MMM
-M - Mode
-R - Register
-M - Reg/Mem
-
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,7 +6,8 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 
 // Parts of instruction
-u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem;
+u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, data8;
+u16 data16;
 
 // Registers (Name Conflict)
 // u16 AX_var, BX_var, CX_var, DX_var;
@@ -61,39 +44,66 @@ void printDecoded() {
 }
 
 void decodeInstructionStream(u8 *binaryStream, int byteAddress) {
-	opcode = binaryStream[byteAddress] >> 2;
-	directionFlag = (binaryStream[byteAddress] & 0x02) >> 1;
-	wordByteFlag = binaryStream[byteAddress] & 0x01;
-	mode = (binaryStream[byteAddress+1] & 0xC0) >> 6;
-	reg = (binaryStream[byteAddress+1] & 0x38) >> 3;
-	regMem = (binaryStream[byteAddress+1] & 0x7);
+
+	if ((binaryStream[byteAddress] & 0xF0) >> 4 == 0xB) {
+	
+		// Immediate to register move
+		opcode = (binaryStream[byteAddress] & 0xF0) >> 4;
+		wordByteFlag = (binaryStream[byteAddress] & 0x8) >> 3;
+		reg = binaryStream[byteAddress] & 0x7;
+		data8 = binaryStream[byteAddress+1] & 0xFF;
+
+	} else {
+
+		// Register to register move
+		opcode = binaryStream[byteAddress] >> 2;
+		directionFlag = (binaryStream[byteAddress] & 0x02) >> 1;
+		wordByteFlag = binaryStream[byteAddress] & 0x01;
+		mode = (binaryStream[byteAddress+1] & 0xC0) >> 6;
+		reg = (binaryStream[byteAddress+1] & 0x38) >> 3;
+		regMem = (binaryStream[byteAddress+1] & 0x7);
+
+	}
+
+
 }
 
-void MOV(FILE* file) {
-	if (directionFlag == REG_SOURCE) {
-		switch (wordByteFlag) {
-			case BYTE:
-				switch (mode) {
-					case MODE_REG:
-						fprintf(file, "mov %s, %s\n", regStrings[regMem+8], regStrings[reg+8]);
-						break;
-				}
-				break;
-			case WORD:
-				fprintf(file, "mov %s, %s\n", regStrings[regMem], regStrings[reg]);
-				break;
-		}
-	} else if (directionFlag == REG_DEST) {
-		// Reverse direction
+void moveImmediateToReg(FILE* file) {
+	switch (wordByteFlag) {
+		case BYTE:
+			fprintf(file, "mov %s, %d\n", regStrings[reg+8], data8);
+			break;
+		case WORD:
+			fprintf(file, "mov %s, %d\n", regStrings[reg], data16);
+			break;
+	}
+}
+
+void moveRegToReg(FILE* file) {
+	switch (wordByteFlag) {
+		case BYTE:
+			switch (mode) {
+				case MODE_REG:
+					if (directionFlag == REG_SOURCE) fprintf(file, "mov %s, %s\n", regStrings[regMem+8], regStrings[reg+8]);
+					if (directionFlag == REG_DEST) fprintf(file, "mov %s, %s\n", regStrings[reg+8], regStrings[regMem+8]);
+					break;
+			}
+			break;
+		case WORD:
+			if (directionFlag == REG_SOURCE) fprintf(file, "mov %s, %s\n", regStrings[regMem], regStrings[reg]);
+			if (directionFlag == REG_DEST) fprintf(file, "mov %s, %s\n", regStrings[reg], regStrings[regMem]);
+			break;
 	}
 }
 
 void generateASM(FILE* fileToWrite) {
 	
-	// Identify Opcode
 	switch (opcode) {
-		case 0x22: // 100010 MOV
-			MOV(fileToWrite);
+		case 0x22: // Reg to reg move
+			moveRegToReg(fileToWrite);
+			break;
+		case 0xB: // Immediate to reg move
+			moveImmediateToReg(fileToWrite);
 			break;
 	}
 }
@@ -146,7 +156,14 @@ int main(int argc, char* argv[]) {
 	for (int i=0; i < fileLength; i+=2) {
 		decodeInstructionStream(fileReadBuffer, i);
 		generateASM(ASMOutputFile);
-	} 
+	}
+	
+	// INCREMENT i BASED ON INSTRUCTION SIZE
+	// Decode instructions and write to output file
+	int fileBytePointer = 0;
+	for (;;) {
+		break;
+	}
 
 	// Close output file
 	fclose(ASMOutputFile);
