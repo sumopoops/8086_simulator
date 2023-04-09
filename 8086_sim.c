@@ -13,7 +13,7 @@ u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, dataLow, dataHigh;
 // u8 SI_var, DI_var, BP_var, SP_var;
 
 // Register Strings
-u8* regStrings[16] = {"ax\0", "cx\0", "dx\0", "bx\0", "sp\0", "bp\0", "si\0", "di\0", "al\0", "cl\0", "dl\0", "bl\0", "ah\0", "ch\0", "dh\0", "bh\0"};
+u8* regStr[16] = {"ax\0", "cx\0", "dx\0", "bx\0", "sp\0", "bp\0", "si\0", "di\0", "al\0", "cl\0", "dl\0", "bl\0", "ah\0", "ch\0", "dh\0", "bh\0"};
 
 // Enums
 enum directions {REG_SOURCE, REG_DEST};
@@ -74,48 +74,19 @@ int decodeInstructionStream(u8 *binaryStream, int byteAddress) {
 	}
 
 	return 1;
-
-
 }
 
 void moveImmediateToReg(FILE* file) {
-	switch (wordByteFlag) {
-		case BYTE:
-			fprintf(file, "mov %s, %d\n", regStrings[reg+8], dataLow);
-			break;
-		case WORD:
-			u16 data16 = dataHigh << 8;
-			data16 += dataLow;
-			fprintf(file, "mov %s, %d\n", regStrings[reg], data16);
-			break;
-	}
+	u16 data16 = (dataHigh << 8) + dataLow;
+	fprintf(file, "mov %s, %d\n", wordByteFlag ? regStr[reg] : regStr[reg+8], data16);
 }
 
 void moveRegToReg(FILE* file) {
-	switch (wordByteFlag) {
-		case BYTE:
-			switch (mode) {
-				case MODE_REG:
-					if (directionFlag == REG_SOURCE) fprintf(file, "mov %s, %s\n", regStrings[regMem+8], regStrings[reg+8]);
-					if (directionFlag == REG_DEST) fprintf(file, "mov %s, %s\n", regStrings[reg+8], regStrings[regMem+8]);
-					break;
-			}
-			break;
-		case WORD:
-			if (directionFlag == REG_SOURCE) fprintf(file, "mov %s, %s\n", regStrings[regMem], regStrings[reg]);
-			if (directionFlag == REG_DEST) fprintf(file, "mov %s, %s\n", regStrings[reg], regStrings[regMem]);
-			break;
-	}
-}
-
-void generateASM(FILE* fileToWrite) {
-	
-	switch (opcode) {
-		case 0x22: // Reg to reg move
-			moveRegToReg(fileToWrite);
-			break;
-		case 0xB: // Immediate to reg move
-			moveImmediateToReg(fileToWrite);
+	switch (mode) {
+		case MODE_REG:
+			int strShift = wordByteFlag ? 0 : 8;
+			if (directionFlag == REG_SOURCE) fprintf(file, "mov %s, %s\n", regStr[regMem+strShift], regStr[reg+strShift]);
+			if (directionFlag == REG_DEST) fprintf(file, "mov %s, %s\n", regStr[reg+strShift], regStr[regMem+strShift]);
 			break;
 	}
 }
@@ -168,7 +139,10 @@ int main(int argc, char* argv[]) {
 	int fileBytePointer = 0;
 	while (fileBytePointer < fileLength) {
 		fileBytePointer += decodeInstructionStream(fileReadBuffer, fileBytePointer);
-		generateASM(ASMOutputFile);
+		switch (opcode) {
+			case 0b100010: moveRegToReg(ASMOutputFile); break;
+			case 0b1011: moveImmediateToReg(ASMOutputFile); break;
+		}
 	}
 
 	// Close output file
