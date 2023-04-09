@@ -6,8 +6,7 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 
 // Parts of instruction
-u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, data8;
-u16 data16;
+u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, data8, data16;
 
 // Registers (Name Conflict)
 // u16 AX_var, BX_var, CX_var, DX_var;
@@ -35,7 +34,7 @@ const char* binPrint(u8 dataByte, int printLength) {
 }
 
 void printDecoded() {
-	printf("OPCODE: \033[32m%s\033[0m  ", binPrint(opcode, 6));
+	printf("OPCODE: \033[32m%d\033[0m  ", binPrint(opcode, 6));
 	printf("DIRECTION: \033[32m%s\033[0m  ", binPrint(directionFlag, 1));
 	printf("WORD/BYTE: \033[32m%s\033[0m  ", binPrint(wordByteFlag, 1));
 	printf("MODE: \033[32m%s\033[0m  ", binPrint(mode, 2));
@@ -45,23 +44,23 @@ void printDecoded() {
 
 void decodeInstructionStream(u8 *binaryStream, int byteAddress) {
 
-	if ((binaryStream[byteAddress] & 0xF0) >> 4 == 0xB) {
+	if ((binaryStream[byteAddress] & 0b11110000) >> 4 == 0b1011) {
 	
 		// Immediate to register move
-		opcode = (binaryStream[byteAddress] & 0xF0) >> 4;
-		wordByteFlag = (binaryStream[byteAddress] & 0x8) >> 3;
-		reg = binaryStream[byteAddress] & 0x7;
-		data8 = binaryStream[byteAddress+1] & 0xFF;
+		opcode = (binaryStream[byteAddress] & 0b11110000) >> 4;
+		wordByteFlag = (binaryStream[byteAddress] & 0b00001000) >> 3;
+		reg = binaryStream[byteAddress] & 0b00000111;
+		data8 = binaryStream[byteAddress+1];
 
 	} else {
 
 		// Register to register move
 		opcode = binaryStream[byteAddress] >> 2;
-		directionFlag = (binaryStream[byteAddress] & 0x02) >> 1;
-		wordByteFlag = binaryStream[byteAddress] & 0x01;
-		mode = (binaryStream[byteAddress+1] & 0xC0) >> 6;
-		reg = (binaryStream[byteAddress+1] & 0x38) >> 3;
-		regMem = (binaryStream[byteAddress+1] & 0x7);
+		directionFlag = (binaryStream[byteAddress] & 0b00000010) >> 1;
+		wordByteFlag = binaryStream[byteAddress] & 0b00000001;
+		mode = (binaryStream[byteAddress+1] & 0b11000000) >> 6;
+		reg = (binaryStream[byteAddress+1] & 0b00111000) >> 3;
+		regMem = (binaryStream[byteAddress+1] & 0b00000111);
 
 	}
 
