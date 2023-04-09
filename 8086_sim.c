@@ -6,7 +6,7 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 
 // Parts of instruction
-u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, data8, data16;
+u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, dataLow, dataHigh;
 
 // Registers (Name Conflict)
 // u16 AX_var, BX_var, CX_var, DX_var;
@@ -42,7 +42,7 @@ void printDecoded() {
 	printf("R/M: \033[32m%s\033[0m\n", binPrint(regMem, 3));
 }
 
-void decodeInstructionStream(u8 *binaryStream, int byteAddress) {
+int decodeInstructionStream(u8 *binaryStream, int byteAddress) {
 
 	if ((binaryStream[byteAddress] & 0b11110000) >> 4 == 0b1011) {
 	
@@ -50,9 +50,17 @@ void decodeInstructionStream(u8 *binaryStream, int byteAddress) {
 		opcode = (binaryStream[byteAddress] & 0b11110000) >> 4;
 		wordByteFlag = (binaryStream[byteAddress] & 0b00001000) >> 3;
 		reg = binaryStream[byteAddress] & 0b00000111;
-		data8 = binaryStream[byteAddress+1];
+		dataLow = binaryStream[byteAddress+1];
+		if (wordByteFlag == BYTE) {
+			return 2;
+		} else {
+			dataHigh = binaryStream[byteAddress+2];
+			return 3;
+		}
 
-	} else {
+	}
+
+	if ((binaryStream[byteAddress] & 0b11111100) >> 2 == 0b100010) {
 
 		// Register to register move
 		opcode = binaryStream[byteAddress] >> 2;
@@ -61,8 +69,11 @@ void decodeInstructionStream(u8 *binaryStream, int byteAddress) {
 		mode = (binaryStream[byteAddress+1] & 0b11000000) >> 6;
 		reg = (binaryStream[byteAddress+1] & 0b00111000) >> 3;
 		regMem = (binaryStream[byteAddress+1] & 0b00000111);
+		return 2;
 
 	}
+
+	return 1;
 
 
 }
@@ -70,9 +81,11 @@ void decodeInstructionStream(u8 *binaryStream, int byteAddress) {
 void moveImmediateToReg(FILE* file) {
 	switch (wordByteFlag) {
 		case BYTE:
-			fprintf(file, "mov %s, %d\n", regStrings[reg+8], data8);
+			fprintf(file, "mov %s, %d\n", regStrings[reg+8], dataLow);
 			break;
 		case WORD:
+			u16 data16 = dataHigh << 8;
+			data16 += dataLow;
 			fprintf(file, "mov %s, %d\n", regStrings[reg], data16);
 			break;
 	}
@@ -152,16 +165,10 @@ int main(int argc, char* argv[]) {
 	fprintf(ASMOutputFile, "bits 16\n\n");
 
 	// Decode instructions and write to output file
-	for (int i=0; i < fileLength; i+=2) {
-		decodeInstructionStream(fileReadBuffer, i);
-		generateASM(ASMOutputFile);
-	}
-	
-	// INCREMENT i BASED ON INSTRUCTION SIZE
-	// Decode instructions and write to output file
 	int fileBytePointer = 0;
-	for (;;) {
-		break;
+	while (fileBytePointer < fileLength) {
+		fileBytePointer += decodeInstructionStream(fileReadBuffer, fileBytePointer);
+		generateASM(ASMOutputFile);
 	}
 
 	// Close output file
