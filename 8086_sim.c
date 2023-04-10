@@ -6,7 +6,7 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 
 // Parts of instruction
-u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, dataLow, dataHigh;
+u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, dataLow, dataHigh, dispLo, dispHi;
 
 // Registers (Name Conflict)
 // u16 AX_var, BX_var, CX_var, DX_var;
@@ -15,11 +15,16 @@ u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, dataLow, dataHigh;
 // Register Strings
 u8* regStr[16] = {"ax\0", "cx\0", "dx\0", "bx\0", "sp\0", "bp\0", "si\0", "di\0", "al\0", "cl\0", "dl\0", "bl\0", "ah\0", "ch\0", "dh\0", "bh\0"};
 
+u8* effAddrStr[8] = {"bx + si\0", "bx + di\0", "bp + si\0", "bp + di\0", "si\0", "di\0", "bp\0", "bx"};
+
 // Enums
 enum directions {REG_SOURCE, REG_DEST};
 enum wordByte {BYTE, WORD};
 enum modes {MODE_MEM_NO_DISP, MODE_MEM_8_DISP, MODE_MEM_16_DISP, MODE_REG};
-enum registers {AX, CX, DX, BX, SP, BP, SI, DI};
+/*enum registers {AX, CX, DX, BX, SP, BP, SI, DI};
+enum mode_mem {BX_SI, BX_DI, BP_SI, BP_DI, SI, DI, DIRECT_ADDRESS, BX};
+enum mode_mem_8_disc {BX_SI_D8, BX_DI_D8, BP_SI_D8, BP_DI_D8, SI_D8, DI_D8, BP_D8, BX_D8};
+enum mode_mem_18_disc {BX_SI_D16, BX_DI_D16, BP_SI_D16, BP_DI_D16, SI_D16, DI_D16, BP_D16, BX_D16};*/
 
 // Globals
 char ASMOutputBuffer[128];
@@ -69,7 +74,23 @@ int decodeInstructionStream(u8 *binaryStream, int byteAddress) {
 		mode = (binaryStream[byteAddress+1] & 0b11000000) >> 6;
 		reg = (binaryStream[byteAddress+1] & 0b00111000) >> 3;
 		regMem = (binaryStream[byteAddress+1] & 0b00000111);
-		return 2;
+		switch (mode) {
+			case MODE_MEM_NO_DISP:
+				return 2;
+				break;
+			case MODE_MEM_8_DISP:
+				dispLo = binaryStream[byteAddress+2];
+				return 3;
+				break;
+			case MODE_MEM_16_DISP:
+				dispLo = binaryStream[byteAddress+2];
+				dispHi = binaryStream[byteAddress+3];
+				return 4;
+				break;
+			case MODE_REG:
+				return 2;
+				break;
+		}
 
 	}
 
@@ -82,11 +103,46 @@ void moveImmediateToReg(FILE* file) {
 }
 
 void moveRegToReg(FILE* file) {
+	int strShift = wordByteFlag ? 0 : 8;
 	switch (mode) {
+		case MODE_MEM_NO_DISP:
+			switch (directionFlag) {
+				case REG_SOURCE:
+					fprintf(file, "mov %s, [%s]\n", regStr[reg+strShift], effAddrStr[regMem]);
+					break;
+				case REG_DEST:
+					fprintf(file, "mov %s, [%s]\n", regStr[reg+strShift], effAddrStr[regMem]);
+					break;
+			}
+			break;
+		case MODE_MEM_8_DISP:
+			// 10001011 01010110 0000000
+			switch (directionFlag) {
+				case REG_SOURCE:
+					if (dispLo) {
+						fprintf(file, "mov %s, [%s + %d]\n", regStr[reg+strShift], effAddrStr[regMem], dispLo);
+					} else {
+						fprintf(file, "mov %s, [%s]\n", regStr[reg+strShift], effAddrStr[regMem]);
+					}
+					break;
+				case REG_DEST:
+					if (dispLo) {
+						fprintf(file, "mov %s, [%s + %d]\n", regStr[reg+strShift], effAddrStr[regMem], dispLo);
+					} else {
+						fprintf(file, "mov %s, [%s]\n", regStr[reg+strShift], effAddrStr[regMem]);
+					}
+					break;
+			}
+			break;
+		case MODE_MEM_16_DISP:
+			fprintf(file, "; MEM 16 BIT DISP\n");
 		case MODE_REG:
-			int strShift = wordByteFlag ? 0 : 8;
-			if (directionFlag == REG_SOURCE) fprintf(file, "mov %s, %s\n", regStr[regMem+strShift], regStr[reg+strShift]);
-			if (directionFlag == REG_DEST) fprintf(file, "mov %s, %s\n", regStr[reg+strShift], regStr[regMem+strShift]);
+			if (directionFlag == REG_SOURCE) {
+				fprintf(file, "mov %s, %s\n", regStr[regMem+strShift], regStr[reg+strShift]);
+			}
+			if (directionFlag == REG_DEST) {
+				fprintf(file, "mov %s, %s\n", regStr[reg+strShift], regStr[regMem+strShift]);
+			} 
 			break;
 	}
 }
