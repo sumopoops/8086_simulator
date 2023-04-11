@@ -116,26 +116,30 @@ void moveRegToReg(FILE* file) {
 			}
 			break;
 		case MODE_MEM_8_DISP:
-			// 10001011 01010110 0000000
+		case MODE_MEM_16_DISP:
+			u16 disp;
+			if (dispLo && dispHi) {
+				disp = (dispHi << 8) + dispLo;
+			} else {
+				disp = dispLo;
+			}
 			switch (directionFlag) {
 				case REG_SOURCE:
-					if (dispLo) {
-						fprintf(file, "mov %s, [%s + %d]\n", regStr[reg+strShift], effAddrStr[regMem], dispLo);
+					if (disp) {
+						fprintf(file, "mov %s, [%s + %d]\n", regStr[reg+strShift], effAddrStr[regMem], disp);
 					} else {
 						fprintf(file, "mov %s, [%s]\n", regStr[reg+strShift], effAddrStr[regMem]);
 					}
 					break;
 				case REG_DEST:
-					if (dispLo) {
-						fprintf(file, "mov %s, [%s + %d]\n", regStr[reg+strShift], effAddrStr[regMem], dispLo);
+					if (disp) {
+						fprintf(file, "mov %s, [%s + %d]\n", regStr[reg+strShift], effAddrStr[regMem], disp);
 					} else {
 						fprintf(file, "mov %s, [%s]\n", regStr[reg+strShift], effAddrStr[regMem]);
 					}
 					break;
 			}
 			break;
-		case MODE_MEM_16_DISP:
-			fprintf(file, "; MEM 16 BIT DISP\n");
 		case MODE_REG:
 			if (directionFlag == REG_SOURCE) {
 				fprintf(file, "mov %s, %s\n", regStr[regMem+strShift], regStr[reg+strShift]);
