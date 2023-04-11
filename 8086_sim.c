@@ -103,12 +103,15 @@ void moveImmediateToReg(FILE* file) {
 }
 
 void moveRegToReg(FILE* file) {
+	// 10001001 00001001
+	// OOOOOODW MMRRRMMM
+	// 10001010 00000000
 	int strShift = wordByteFlag ? 0 : 8;
 	switch (mode) {
 		case MODE_MEM_NO_DISP:
 			switch (directionFlag) {
 				case REG_SOURCE:
-					fprintf(file, "mov %s, [%s]\n", regStr[reg+strShift], effAddrStr[regMem]);
+					fprintf(file, "mov [%s], %s\n", effAddrStr[regMem], regStr[reg+strShift]);
 					break;
 				case REG_DEST:
 					fprintf(file, "mov %s, [%s]\n", regStr[reg+strShift], effAddrStr[regMem]);
@@ -128,7 +131,7 @@ void moveRegToReg(FILE* file) {
 					if (disp) {
 						fprintf(file, "mov %s, [%s + %d]\n", regStr[reg+strShift], effAddrStr[regMem], disp);
 					} else {
-						fprintf(file, "mov %s, [%s]\n", regStr[reg+strShift], effAddrStr[regMem]);
+						fprintf(file, "mov [%s], %s\n", effAddrStr[regMem], regStr[reg+strShift]);
 					}
 					break;
 				case REG_DEST:
