@@ -8,9 +8,9 @@ typedef unsigned short u16;
 // Parts of instruction
 u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, dataLow, dataHigh, dispLo, dispHi;
 
-// Registers (Name Conflict)
-// u16 AX_var, BX_var, CX_var, DX_var;
-// u8 SI_var, DI_var, BP_var, SP_var;
+// Registers
+u16 AX, BX, CX, DX;
+u8 SI, DI, BP, SP;
 
 // Register Strings
 u8* regStr[16] = {"ax\0", "cx\0", "dx\0", "bx\0", "sp\0", "bp\0", "si\0", "di\0", "al\0", "cl\0", "dl\0", "bl\0", "ah\0", "ch\0", "dh\0", "bh\0"};
@@ -103,9 +103,6 @@ void moveImmediateToReg(FILE* file) {
 }
 
 void moveRegToReg(FILE* file) {
-	// 10001001 00001001
-	// OOOOOODW MMRRRMMM
-	// 10001010 00000000
 	int strShift = wordByteFlag ? 0 : 8;
 	switch (mode) {
 		case MODE_MEM_NO_DISP:
