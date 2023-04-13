@@ -21,33 +21,13 @@ u8* effAddrStr[8] = {"bx + si\0", "bx + di\0", "bp + si\0", "bp + di\0", "si\0",
 enum directions {REG_SOURCE, REG_DEST};
 enum wordByte {BYTE, WORD};
 enum modes {MODE_MEM_NO_DISP, MODE_MEM_8_DISP, MODE_MEM_16_DISP, MODE_REG};
-/*enum registers {AX, CX, DX, BX, SP, BP, SI, DI};
-enum mode_mem {BX_SI, BX_DI, BP_SI, BP_DI, SI, DI, DIRECT_ADDRESS, BX};
-enum mode_mem_8_disc {BX_SI_D8, BX_DI_D8, BP_SI_D8, BP_DI_D8, SI_D8, DI_D8, BP_D8, BX_D8};
-enum mode_mem_18_disc {BX_SI_D16, BX_DI_D16, BP_SI_D16, BP_DI_D16, SI_D16, DI_D16, BP_D16, BX_D16};*/
 
 // Globals
 char ASMOutputBuffer[128];
 
-const char* binPrint(u8 dataByte, int printLength) {
-	char binaryString[printLength+1];
-	for (int i=printLength-1; i>=0; i--) {
-		binaryString[i] = ((dataByte >> i) & 1) == 1 ? '1' : '0';
-	}
-	char* returnString = (char*)binaryString;
-	return returnString;
-}
+int decodeInstructionBytes(u8 *binaryStream, int byteAddress, FILE* file) {
 
-void printDecoded() {
-	printf("OPCODE: \033[32m%d\033[0m  ", binPrint(opcode, 6));
-	printf("DIRECTION: \033[32m%s\033[0m  ", binPrint(directionFlag, 1));
-	printf("WORD/BYTE: \033[32m%s\033[0m  ", binPrint(wordByteFlag, 1));
-	printf("MODE: \033[32m%s\033[0m  ", binPrint(mode, 2));
-	printf("REG: \033[32m%s\033[0m  ", binPrint(reg, 3));
-	printf("R/M: \033[32m%s\033[0m\n", binPrint(regMem, 3));
-}
-
-int decodeInstructionStream(u8 *binaryStream, int byteAddress) {
+	int instructionLength = 1;
 
 	if ((binaryStream[byteAddress] & 0b11110000) >> 4 == 0b1011) {
 	
@@ -56,18 +36,33 @@ int decodeInstructionStream(u8 *binaryStream, int byteAddress) {
 		wordByteFlag = (binaryStream[byteAddress] & 0b00001000) >> 3;
 		reg = binaryStream[byteAddress] & 0b00000111;
 		dataLow = binaryStream[byteAddress+1];
+
 		if (wordByteFlag == BYTE) {
-			return 2;
+			instructionLength = 2;
 		} else {
 			dataHigh = binaryStream[byteAddress+2];
-			return 3;
+			instructionLength = 3;
 		}
+
+		u16 data16 = (dataHigh << 8) + dataLow;
+		fprintf(file, "mov %s, %d\n", wordByteFlag ? regStr[reg] : regStr[reg+8], data16);
 
 	}
 
-	if ((binaryStream[byteAddress] & 0b11111100) >> 2 == 0b100010) {
 
-		// Register to register move
+
+	if ((binaryStream[byteAddress] & 0b11111100) >> 2 == 0b100000) {
+
+		// Immediate to register/memory add
+		printf("IMMEDIATE ADD");
+
+	}
+
+
+
+	if ((binaryStream[byteAddress] & 0b11111100) >> 2 == 0b100010 || (binaryStream[byteAddress] & 0b11111100) >> 2 == 0b000000) {
+
+		// Register/memory to register/memory move/add
 		opcode = binaryStream[byteAddress] >> 2;
 		directionFlag = (binaryStream[byteAddress] & 0b00000010) >> 1;
 		wordByteFlag = binaryStream[byteAddress] & 0b00000001;
@@ -76,79 +71,75 @@ int decodeInstructionStream(u8 *binaryStream, int byteAddress) {
 		regMem = (binaryStream[byteAddress+1] & 0b00000111);
 		switch (mode) {
 			case MODE_MEM_NO_DISP:
-				return 2;
+				instructionLength = 2;
 				break;
 			case MODE_MEM_8_DISP:
 				dispLo = binaryStream[byteAddress+2];
-				return 3;
+				instructionLength = 3;
 				break;
 			case MODE_MEM_16_DISP:
 				dispLo = binaryStream[byteAddress+2];
 				dispHi = binaryStream[byteAddress+3];
-				return 4;
+				instructionLength = 4;
 				break;
 			case MODE_REG:
-				return 2;
+				instructionLength = 2;
+				break;
+		}
+
+		char* operation;
+		if (opcode == 0b100010) operation = "mov"; 
+		if (opcode == 0b000000) operation = "add"; 
+		int strShift = wordByteFlag ? 0 : 8;
+		switch (mode) {
+			case MODE_MEM_NO_DISP:
+				switch (directionFlag) {
+					case REG_SOURCE:
+						fprintf(file, "%s [%s], %s\n", operation, effAddrStr[regMem], regStr[reg+strShift]);
+						break;
+					case REG_DEST:
+						fprintf(file, "%s %s, [%s]\n", operation, regStr[reg+strShift], effAddrStr[regMem]);
+						break;
+				}
+				break;
+			case MODE_MEM_8_DISP:
+			case MODE_MEM_16_DISP:
+				u16 disp;
+				if (dispLo && dispHi) {
+					disp = (dispHi << 8) + dispLo;
+				} else {
+					disp = dispLo;
+				}
+				switch (directionFlag) {
+					case REG_SOURCE:
+						if (disp) {
+							fprintf(file, "%s %s, [%s + %d]\n", operation, regStr[reg+strShift], effAddrStr[regMem], disp);
+						} else {
+							fprintf(file, "%s [%s], %s\n", operation, effAddrStr[regMem], regStr[reg+strShift]);
+						}
+						break;
+					case REG_DEST:
+						if (disp) {
+							fprintf(file, "%s %s, [%s + %d]\n", operation, regStr[reg+strShift], effAddrStr[regMem], disp);
+						} else {
+							fprintf(file, "%s %s, [%s]\n", operation, regStr[reg+strShift], effAddrStr[regMem]);
+						}
+						break;
+				}
+				break;
+			case MODE_REG:
+				if (directionFlag == REG_SOURCE) {
+					fprintf(file, "%s %s, %s\n", operation, regStr[regMem+strShift], regStr[reg+strShift]);
+				}
+				if (directionFlag == REG_DEST) {
+					fprintf(file, "%s %s, %s\n", operation, regStr[reg+strShift], regStr[regMem+strShift]);
+				} 
 				break;
 		}
 
 	}
 
-	return 1;
-}
-
-void moveImmediateToReg(FILE* file) {
-	u16 data16 = (dataHigh << 8) + dataLow;
-	fprintf(file, "mov %s, %d\n", wordByteFlag ? regStr[reg] : regStr[reg+8], data16);
-}
-
-void moveRegToReg(FILE* file) {
-	int strShift = wordByteFlag ? 0 : 8;
-	switch (mode) {
-		case MODE_MEM_NO_DISP:
-			switch (directionFlag) {
-				case REG_SOURCE:
-					fprintf(file, "mov [%s], %s\n", effAddrStr[regMem], regStr[reg+strShift]);
-					break;
-				case REG_DEST:
-					fprintf(file, "mov %s, [%s]\n", regStr[reg+strShift], effAddrStr[regMem]);
-					break;
-			}
-			break;
-		case MODE_MEM_8_DISP:
-		case MODE_MEM_16_DISP:
-			u16 disp;
-			if (dispLo && dispHi) {
-				disp = (dispHi << 8) + dispLo;
-			} else {
-				disp = dispLo;
-			}
-			switch (directionFlag) {
-				case REG_SOURCE:
-					if (disp) {
-						fprintf(file, "mov %s, [%s + %d]\n", regStr[reg+strShift], effAddrStr[regMem], disp);
-					} else {
-						fprintf(file, "mov [%s], %s\n", effAddrStr[regMem], regStr[reg+strShift]);
-					}
-					break;
-				case REG_DEST:
-					if (disp) {
-						fprintf(file, "mov %s, [%s + %d]\n", regStr[reg+strShift], effAddrStr[regMem], disp);
-					} else {
-						fprintf(file, "mov %s, [%s]\n", regStr[reg+strShift], effAddrStr[regMem]);
-					}
-					break;
-			}
-			break;
-		case MODE_REG:
-			if (directionFlag == REG_SOURCE) {
-				fprintf(file, "mov %s, %s\n", regStr[regMem+strShift], regStr[reg+strShift]);
-			}
-			if (directionFlag == REG_DEST) {
-				fprintf(file, "mov %s, %s\n", regStr[reg+strShift], regStr[regMem+strShift]);
-			} 
-			break;
-	}
+	return instructionLength;
 }
 
 int main(int argc, char* argv[]) {
@@ -198,11 +189,7 @@ int main(int argc, char* argv[]) {
 	// Decode instructions and write to output file
 	int fileBytePointer = 0;
 	while (fileBytePointer < fileLength) {
-		fileBytePointer += decodeInstructionStream(fileReadBuffer, fileBytePointer);
-		switch (opcode) {
-			case 0b100010: moveRegToReg(ASMOutputFile); break;
-			case 0b1011: moveImmediateToReg(ASMOutputFile); break;
-		}
+		fileBytePointer += decodeInstructionBytes(fileReadBuffer, fileBytePointer, ASMOutputFile);
 	}
 
 	// Close output file
