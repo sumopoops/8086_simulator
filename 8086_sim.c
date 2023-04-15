@@ -29,9 +29,9 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 
 	int instructionLength = 1;
 
+	// Immediate to register move
 	if ((fBuffer[curByte] & 0b11110000) >> 4 == 0b1011) {
 	
-		// Immediate to register move
 		opcode = (fBuffer[curByte] & 0b11110000) >> 4;
 		wordByteFlag = (fBuffer[curByte] & 0b00001000) >> 3;
 		reg = fBuffer[curByte] & 0b00000111;
@@ -51,18 +51,55 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 
 
 
+	// Immediate to register/memory add
 	if ((fBuffer[curByte] & 0b11111100) >> 2 == 0b100000) {
 
-		// Immediate to register/memory add
-		fprintf(file, "; IMMEDIATE TO R/M ADD\n");
+		// 10000011 11000110 00000010
+		// 10000011 11000101 00000010
+		// 10000011 11000001 00001000
+		// OOOOOOSW MM---RRR DATADATA
 
+		signFlag = (fBuffer[curByte] & 0b00000010) >> 1;
+		wordByteFlag = fBuffer[curByte] & 0b00000001;
+		mode = (fBuffer[curByte+1] & 0b11000000) >> 6;
+		reg = (fBuffer[curByte+1] & 0b00111000) >> 3;
+		regMem = (fBuffer[curByte+1] & 0b00000111);
+
+		switch (mode) {
+			case MODE_MEM_NO_DISP:
+				instructionLength = 3;
+				dataLow = fBuffer[curByte+2];
+				break;
+			case MODE_MEM_8_DISP:
+				dispLo = fBuffer[curByte+2];
+				dataLow = fBuffer[curByte+3];
+				instructionLength = 4;
+				break;
+			case MODE_MEM_16_DISP:
+				dispLo = fBuffer[curByte+2];
+				dispHi = fBuffer[curByte+3];
+				instructionLength = 4;
+				break;
+			case MODE_REG:
+				instructionLength = 3;
+				dataLow = fBuffer[curByte+2];
+				/* BYTE FLAG DOESNT MEAN 16 BITS OF DATA 
+				if (wordByteFlag == WORD) {
+					dataHigh = fBuffer[curByte+3];
+					instructionLength = 4;
+				}
+				*/
+				u16 data16 = (dataHigh << 8) + dataLow;
+				fprintf(file, "add %s, %d\n", wordByteFlag ? regStr[regMem] : regStr[regMem+8], data16);
+				break;
+		}
 	}
 
 
 
+	// Register/memory to register/memory move/add
 	if ((fBuffer[curByte] & 0b11111100) >> 2 == 0b100010 || (fBuffer[curByte] & 0b11111100) >> 2 == 0b000000) {
 
-		// Register/memory to register/memory move/add
 		opcode = fBuffer[curByte] >> 2;
 		directionFlag = (fBuffer[curByte] & 0b00000010) >> 1;
 		wordByteFlag = fBuffer[curByte] & 0b00000001;
