@@ -6,7 +6,7 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 
 // Parts of instruction
-u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, dataLow, dataHigh, dispLo, dispHi;
+u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, dataLow, dataHigh, dispLo, dispHi, signFlag;
 
 // Registers
 u16 AX, BX, CX, DX;
@@ -25,22 +25,22 @@ enum modes {MODE_MEM_NO_DISP, MODE_MEM_8_DISP, MODE_MEM_16_DISP, MODE_REG};
 // Globals
 char ASMOutputBuffer[128];
 
-int decodeInstructionBytes(u8 *binaryStream, int byteAddress, FILE* file) {
+int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 
 	int instructionLength = 1;
 
-	if ((binaryStream[byteAddress] & 0b11110000) >> 4 == 0b1011) {
+	if ((fBuffer[curByte] & 0b11110000) >> 4 == 0b1011) {
 	
 		// Immediate to register move
-		opcode = (binaryStream[byteAddress] & 0b11110000) >> 4;
-		wordByteFlag = (binaryStream[byteAddress] & 0b00001000) >> 3;
-		reg = binaryStream[byteAddress] & 0b00000111;
-		dataLow = binaryStream[byteAddress+1];
+		opcode = (fBuffer[curByte] & 0b11110000) >> 4;
+		wordByteFlag = (fBuffer[curByte] & 0b00001000) >> 3;
+		reg = fBuffer[curByte] & 0b00000111;
+		dataLow = fBuffer[curByte+1];
 
 		if (wordByteFlag == BYTE) {
 			instructionLength = 2;
 		} else {
-			dataHigh = binaryStream[byteAddress+2];
+			dataHigh = fBuffer[curByte+2];
 			instructionLength = 3;
 		}
 
@@ -51,35 +51,35 @@ int decodeInstructionBytes(u8 *binaryStream, int byteAddress, FILE* file) {
 
 
 
-	if ((binaryStream[byteAddress] & 0b11111100) >> 2 == 0b100000) {
+	if ((fBuffer[curByte] & 0b11111100) >> 2 == 0b100000) {
 
 		// Immediate to register/memory add
-		printf("IMMEDIATE ADD");
+		fprintf(file, "; IMMEDIATE TO R/M ADD\n");
 
 	}
 
 
 
-	if ((binaryStream[byteAddress] & 0b11111100) >> 2 == 0b100010 || (binaryStream[byteAddress] & 0b11111100) >> 2 == 0b000000) {
+	if ((fBuffer[curByte] & 0b11111100) >> 2 == 0b100010 || (fBuffer[curByte] & 0b11111100) >> 2 == 0b000000) {
 
 		// Register/memory to register/memory move/add
-		opcode = binaryStream[byteAddress] >> 2;
-		directionFlag = (binaryStream[byteAddress] & 0b00000010) >> 1;
-		wordByteFlag = binaryStream[byteAddress] & 0b00000001;
-		mode = (binaryStream[byteAddress+1] & 0b11000000) >> 6;
-		reg = (binaryStream[byteAddress+1] & 0b00111000) >> 3;
-		regMem = (binaryStream[byteAddress+1] & 0b00000111);
+		opcode = fBuffer[curByte] >> 2;
+		directionFlag = (fBuffer[curByte] & 0b00000010) >> 1;
+		wordByteFlag = fBuffer[curByte] & 0b00000001;
+		mode = (fBuffer[curByte+1] & 0b11000000) >> 6;
+		reg = (fBuffer[curByte+1] & 0b00111000) >> 3;
+		regMem = (fBuffer[curByte+1] & 0b00000111);
 		switch (mode) {
 			case MODE_MEM_NO_DISP:
 				instructionLength = 2;
 				break;
 			case MODE_MEM_8_DISP:
-				dispLo = binaryStream[byteAddress+2];
+				dispLo = fBuffer[curByte+2];
 				instructionLength = 3;
 				break;
 			case MODE_MEM_16_DISP:
-				dispLo = binaryStream[byteAddress+2];
-				dispHi = binaryStream[byteAddress+3];
+				dispLo = fBuffer[curByte+2];
+				dispHi = fBuffer[curByte+3];
 				instructionLength = 4;
 				break;
 			case MODE_REG:
