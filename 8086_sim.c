@@ -21,13 +21,31 @@ u8* effAddrStr[8] = {"bx + si\0", "bx + di\0", "bp + si\0", "bp + di\0", "si\0",
 enum directions {REG_SOURCE, REG_DEST};
 enum wordByte {BYTE, WORD};
 enum modes {MODE_MEM_NO_DISP, MODE_MEM_8_DISP, MODE_MEM_16_DISP, MODE_REG};
+typedef enum bool {false, true} bool;
 
 // Globals
 char ASMOutputBuffer[128];
 
+// Settings
+int debug = true;
+
+long long binPrint(u8 byte) {
+  long long bin = 0;
+  int rem, i = 1;
+
+  while (byte!=0) {
+    rem = byte % 2;
+    byte /= 2;
+    bin += rem * i;
+    i *= 10;
+  }
+
+  return bin;
+}
+
 int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 
-	int instructionLength = 1;
+	int instructionLength = 0;
 
 	// Immediate to register move
 	if ((fBuffer[curByte] & 0b11110000) >> 4 == 0b1011) {
@@ -54,11 +72,6 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 	// Immediate to register/memory add
 	if ((fBuffer[curByte] & 0b11111100) >> 2 == 0b100000) {
 
-		// 10000011 11000110 00000010
-		// 10000011 11000101 00000010
-		// 10000011 11000001 00001000
-		// OOOOOOSW MM---RRR DATADATA
-
 		signFlag = (fBuffer[curByte] & 0b00000010) >> 1;
 		wordByteFlag = fBuffer[curByte] & 0b00000001;
 		mode = (fBuffer[curByte+1] & 0b11000000) >> 6;
@@ -69,16 +82,19 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 			case MODE_MEM_NO_DISP:
 				instructionLength = 3;
 				dataLow = fBuffer[curByte+2];
+				fprintf(file, "; NO DISPLACEMENT\n");
 				break;
 			case MODE_MEM_8_DISP:
 				dispLo = fBuffer[curByte+2];
 				dataLow = fBuffer[curByte+3];
+				fprintf(file, "; 8 BIT DISPLACEMENT\n");
 				instructionLength = 4;
 				break;
 			case MODE_MEM_16_DISP:
 				dispLo = fBuffer[curByte+2];
 				dispHi = fBuffer[curByte+3];
 				instructionLength = 4;
+				fprintf(file, "; 16 BIT DISPLACEMENT\n");
 				break;
 			case MODE_REG:
 				instructionLength = 3;
@@ -176,6 +192,15 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 
 	}
 
+	// Debug
+	if (debug) {
+		if (instructionLength > 0) fprintf(file, "; ");
+		for (int i = 0; i < instructionLength; i++) {
+			fprintf(file, "%08lld ", binPrint(fBuffer[curByte+i]));
+		}
+		if (instructionLength > 0) fprintf(file, "\n\n");
+	}
+
 	return instructionLength;
 }
 
@@ -225,8 +250,15 @@ int main(int argc, char* argv[]) {
 
 	// Decode instructions and write to output file
 	int fileBytePointer = 0;
+	int increment = 0;
 	while (fileBytePointer < fileLength) {
-		fileBytePointer += decodeInstructionBytes(fileReadBuffer, fileBytePointer, ASMOutputFile);
+		increment = decodeInstructionBytes(fileReadBuffer, fileBytePointer, ASMOutputFile);
+		if (increment > 0 ) {
+			fileBytePointer += increment;
+		} else {
+			printf("Cannot decode bytes");
+			exit(1);
+		}
 	}
 
 	// Close output file
