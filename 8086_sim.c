@@ -6,7 +6,7 @@ typedef unsigned char u8;
 typedef unsigned short u16;
 
 // Parts of instruction
-u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, dataLow, dataHigh, dispLo, dispHi, signFlag;
+u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, dataLow, dataHigh, dispLo, dispHi, SWbits;
 
 // Registers
 u16 AX, BX, CX, DX;
@@ -72,17 +72,25 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 	// Immediate to register/memory add
 	if ((fBuffer[curByte] & 0b11111100) >> 2 == 0b100000) {
 
-		signFlag = (fBuffer[curByte] & 0b00000010) >> 1;
-		wordByteFlag = fBuffer[curByte] & 0b00000001;
+		/* 	SW Table
+			00 - 8 bit data
+			01 - 16 Bit data
+			10 - 8 bit data
+			11 - 8 bit converted to 16bits
+		*/
+
+		SWbits = (fBuffer[curByte] & 0b00000011);
 		mode = (fBuffer[curByte+1] & 0b11000000) >> 6;
 		reg = (fBuffer[curByte+1] & 0b00111000) >> 3;
 		regMem = (fBuffer[curByte+1] & 0b00000111);
+		wordByteFlag = (fBuffer[curByte] & 0b00000001);
 
 		switch (mode) {
 			case MODE_MEM_NO_DISP:
 				instructionLength = 3;
 				dataLow = fBuffer[curByte+2];
 				fprintf(file, "; NO DISPLACEMENT\n");
+				fprintf(file, "add %s [%s], %d\n", wordByteFlag ? "word" : "byte", effAddrStr[regMem], dataLow);
 				break;
 			case MODE_MEM_8_DISP:
 				dispLo = fBuffer[curByte+2];
