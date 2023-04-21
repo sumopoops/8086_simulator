@@ -89,7 +89,6 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 			case MODE_MEM_NO_DISP:
 				instructionLength = 3;
 				dataLow = fBuffer[curByte+2];
-				fprintf(file, "; NO DISPLACEMENT\n");
 				fprintf(file, "add %s [%s], %d\n", wordByteFlag ? "word" : "byte", effAddrStr[regMem], dataLow);
 				break;
 			case MODE_MEM_8_DISP:
@@ -101,18 +100,14 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 			case MODE_MEM_16_DISP:
 				dispLo = fBuffer[curByte+2];
 				dispHi = fBuffer[curByte+3];
-				instructionLength = 4;
-				fprintf(file, "; 16 BIT DISPLACEMENT\n");
+				dataLow = fBuffer[curByte+4];
+				instructionLength = 5;
+				u16 disp = (dispHi << 8) + dispLo;
+				fprintf(file, "add %s [%s + %d], %d\n", wordByteFlag ? "word" : "byte", effAddrStr[regMem], disp, dataLow);
 				break;
 			case MODE_REG:
 				instructionLength = 3;
 				dataLow = fBuffer[curByte+2];
-				/* BYTE FLAG DOESNT MEAN 16 BITS OF DATA 
-				if (wordByteFlag == WORD) {
-					dataHigh = fBuffer[curByte+3];
-					instructionLength = 4;
-				}
-				*/
 				u16 data16 = (dataHigh << 8) + dataLow;
 				fprintf(file, "add %s, %d\n", wordByteFlag ? regStr[regMem] : regStr[regMem+8], data16);
 				break;
@@ -205,8 +200,12 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 		if (instructionLength > 0) fprintf(file, "; ");
 		for (int i = 0; i < instructionLength; i++) {
 			fprintf(file, "%08lld ", binPrint(fBuffer[curByte+i]));
+			printf("%08lld ", binPrint(fBuffer[curByte+i]));
 		}
-		if (instructionLength > 0) fprintf(file, "\n\n");
+		if (instructionLength > 0) {
+			fprintf(file, "\n\n");
+			printf("\n");
+		}
 	}
 
 	return instructionLength;
