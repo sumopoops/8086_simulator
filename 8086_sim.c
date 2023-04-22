@@ -33,7 +33,7 @@ long long binPrint(u8 byte) {
   long long bin = 0;
   int rem, i = 1;
 
-  while (byte!=0) {
+  while (byte != 0) {
     rem = byte % 2;
     byte /= 2;
     bin += rem * i;
@@ -260,10 +260,13 @@ int main(int argc, char* argv[]) {
 	int increment = 0;
 	while (fileBytePointer < fileLength) {
 		increment = decodeInstructionBytes(fileReadBuffer, fileBytePointer, ASMOutputFile);
-		if (increment > 0 ) {
+		if (increment > 0) {
 			fileBytePointer += increment;
+			increment = 0;
 		} else {
-			printf("Cannot decode bytes");
+			printf("Cannot decode bytes\nFinal bytes: \033[31m");
+			for (int i=0; i<6; i++) printf("%08lld ", binPrint(fileReadBuffer[fileBytePointer+i]));
+			printf("\033[0m\n");
 			exit(1);
 		}
 	}
