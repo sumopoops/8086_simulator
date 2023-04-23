@@ -27,38 +27,46 @@ typedef enum bool {false, true} bool;
 char ASMOutputBuffer[128];
 
 // Settings
-int debug = true;
+int debug = false;
 
-long long binPrint(u8 byte) {
-  long long bin = 0;
-  int rem, i = 1;
-
-  while (byte != 0) {
-    rem = byte % 2;
-    byte /= 2;
-    bin += rem * i;
-    i *= 10;
-  }
-
-  return bin;
+int getFileLength(FILE* file) {
+	int fileLength = 0;
+	fseek(file, 0, SEEK_END);
+	fileLength = ftell(file);
+	fseek(file, 0, SEEK_SET);
+	return fileLength;
 }
 
-int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
+long long binPrint(u8 byte) {
+	long long bin = 0;
+	int rem, i = 1;
+
+	while (byte != 0) {
+    	rem = byte % 2;
+    	byte /= 2;
+    	bin += rem * i;
+    	i *= 10;
+ 	}
+
+	return bin;
+}
+
+int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 
 	int instructionLength = 0;
 
 	// Immediate to register move
-	if ((fBuffer[curByte] & 0b11110000) >> 4 == 0b1011) {
+	if ((buffer[byte] & 0b11110000) >> 4 == 0b1011) {
 	
-		opcode = (fBuffer[curByte] & 0b11110000) >> 4;
-		wordByteFlag = (fBuffer[curByte] & 0b00001000) >> 3;
-		reg = fBuffer[curByte] & 0b00000111;
-		dataLow = fBuffer[curByte+1];
+		opcode = (buffer[byte] & 0b11110000) >> 4;
+		wordByteFlag = (buffer[byte] & 0b00001000) >> 3;
+		reg = buffer[byte] & 0b00000111;
+		dataLow = buffer[byte+1];
 
 		if (wordByteFlag == BYTE) {
 			instructionLength = 2;
 		} else {
-			dataHigh = fBuffer[curByte+2];
+			dataHigh = buffer[byte+2];
 			instructionLength = 3;
 		}
 
@@ -69,8 +77,26 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 
 
 
+	// Immediate to accumulator add
+	if ((buffer[byte]) >> 1 == 0b10) {
+		wordByteFlag = buffer[byte] & 0b00000001;
+		int strShift;
+		strShift = wordByteFlag ? 0 : 8;
+		u16 data16;
+		if (wordByteFlag == BYTE) {
+			instructionLength = 2;
+			data16 = buffer[byte+1];
+		} else if (wordByteFlag == WORD) {
+			instructionLength = 3;
+			data16 = buffer[byte+1] + (buffer[byte+2] << 8);
+		}
+		fprintf(file, "add %s, %d\n", regStr[0+strShift], data16);
+	}
+
+
+
 	// Immediate to register/memory add
-	if ((fBuffer[curByte] & 0b11111100) >> 2 == 0b100000) {
+	if ((buffer[byte] & 0b11111100) >> 2 == 0b100000) {
 
 		/* 	SW Table
 			00 - 8 bit data
@@ -79,35 +105,35 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 			11 - 8 bit converted to 16bits
 		*/
 
-		SWbits = (fBuffer[curByte] & 0b00000011);
-		mode = (fBuffer[curByte+1] & 0b11000000) >> 6;
-		reg = (fBuffer[curByte+1] & 0b00111000) >> 3;
-		regMem = (fBuffer[curByte+1] & 0b00000111);
-		wordByteFlag = (fBuffer[curByte] & 0b00000001);
+		SWbits = (buffer[byte] & 0b00000011);
+		mode = (buffer[byte+1] & 0b11000000) >> 6;
+		reg = (buffer[byte+1] & 0b00111000) >> 3;
+		regMem = (buffer[byte+1] & 0b00000111);
+		wordByteFlag = (buffer[byte] & 0b00000001);
 
 		switch (mode) {
 			case MODE_MEM_NO_DISP:
 				instructionLength = 3;
-				dataLow = fBuffer[curByte+2];
+				dataLow = buffer[byte+2];
 				fprintf(file, "add %s [%s], %d\n", wordByteFlag ? "word" : "byte", effAddrStr[regMem], dataLow);
 				break;
 			case MODE_MEM_8_DISP:
-				dispLo = fBuffer[curByte+2];
-				dataLow = fBuffer[curByte+3];
+				dispLo = buffer[byte+2];
+				dataLow = buffer[byte+3];
 				fprintf(file, "; 8 BIT DISPLACEMENT\n");
 				instructionLength = 4;
 				break;
 			case MODE_MEM_16_DISP:
-				dispLo = fBuffer[curByte+2];
-				dispHi = fBuffer[curByte+3];
-				dataLow = fBuffer[curByte+4];
+				dispLo = buffer[byte+2];
+				dispHi = buffer[byte+3];
+				dataLow = buffer[byte+4];
 				instructionLength = 5;
 				u16 disp = (dispHi << 8) + dispLo;
 				fprintf(file, "add %s [%s + %d], %d\n", wordByteFlag ? "word" : "byte", effAddrStr[regMem], disp, dataLow);
 				break;
 			case MODE_REG:
 				instructionLength = 3;
-				dataLow = fBuffer[curByte+2];
+				dataLow = buffer[byte+2];
 				u16 data16 = (dataHigh << 8) + dataLow;
 				fprintf(file, "add %s, %d\n", wordByteFlag ? regStr[regMem] : regStr[regMem+8], data16);
 				break;
@@ -117,25 +143,25 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 
 
 	// Register/memory to register/memory move/add
-	if ((fBuffer[curByte] & 0b11111100) >> 2 == 0b100010 || (fBuffer[curByte] & 0b11111100) >> 2 == 0b000000) {
+	if ((buffer[byte] & 0b11111100) >> 2 == 0b100010 || (buffer[byte] & 0b11111100) >> 2 == 0b000000) {
 
-		opcode = fBuffer[curByte] >> 2;
-		directionFlag = (fBuffer[curByte] & 0b00000010) >> 1;
-		wordByteFlag = fBuffer[curByte] & 0b00000001;
-		mode = (fBuffer[curByte+1] & 0b11000000) >> 6;
-		reg = (fBuffer[curByte+1] & 0b00111000) >> 3;
-		regMem = (fBuffer[curByte+1] & 0b00000111);
+		opcode = buffer[byte] >> 2;
+		directionFlag = (buffer[byte] & 0b00000010) >> 1;
+		wordByteFlag = buffer[byte] & 0b00000001;
+		mode = (buffer[byte+1] & 0b11000000) >> 6;
+		reg = (buffer[byte+1] & 0b00111000) >> 3;
+		regMem = (buffer[byte+1] & 0b00000111);
 		switch (mode) {
 			case MODE_MEM_NO_DISP:
 				instructionLength = 2;
 				break;
 			case MODE_MEM_8_DISP:
-				dispLo = fBuffer[curByte+2];
+				dispLo = buffer[byte+2];
 				instructionLength = 3;
 				break;
 			case MODE_MEM_16_DISP:
-				dispLo = fBuffer[curByte+2];
-				dispHi = fBuffer[curByte+3];
+				dispLo = buffer[byte+2];
+				dispHi = buffer[byte+3];
 				instructionLength = 4;
 				break;
 			case MODE_REG:
@@ -199,12 +225,10 @@ int decodeInstructionBytes(u8 *fBuffer, int curByte, FILE* file) {
 	if (debug) {
 		if (instructionLength > 0) fprintf(file, "; ");
 		for (int i = 0; i < instructionLength; i++) {
-			fprintf(file, "%08lld ", binPrint(fBuffer[curByte+i]));
-			printf("%08lld ", binPrint(fBuffer[curByte+i]));
+			fprintf(file, "%08lld ", binPrint(buffer[byte+i]));
 		}
 		if (instructionLength > 0) {
 			fprintf(file, "\n\n");
-			printf("\n");
 		}
 	}
 
@@ -225,7 +249,7 @@ int main(int argc, char* argv[]) {
 
 	// Create variables
 	FILE *binaryInputFile;
-	u8 fileReadBuffer[64];
+	u8 fileReadBuffer[512];
 	memset(fileReadBuffer, 0, sizeof(fileReadBuffer));
 
 	// Open file
@@ -235,13 +259,10 @@ int main(int argc, char* argv[]) {
 	}
 
 	// Get length of file
-	int fileLength = 0;
-	fseek(binaryInputFile, 0, SEEK_END);
-	fileLength = ftell(binaryInputFile);
-	fseek(binaryInputFile, 0, SEEK_SET);
+	int fileLength = getFileLength(binaryInputFile);
 
 	// Read data from file and close
-	fread(&fileReadBuffer, 64, 1, binaryInputFile);	
+	fread(&fileReadBuffer, 512, 1, binaryInputFile);	
 	fclose(binaryInputFile);
 
 	// Open file for writing (text mode)
@@ -254,6 +275,15 @@ int main(int argc, char* argv[]) {
 		exit(1);
 	}
 	fprintf(ASMOutputFile, "bits 16\n\n");
+
+	// Debug print all bytes
+	if (debug) {
+		printf("File length: \033[33m%d\033[0m\n", fileLength);
+		for (int i=0; i<fileLength; i++) {
+			if (i % 6 == 0) printf("\n");
+			printf("%08lld ", binPrint(fileReadBuffer[i]));
+		}
+	}
 
 	// Decode instructions and write to output file
 	int fileBytePointer = 0;
