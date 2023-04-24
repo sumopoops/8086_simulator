@@ -77,8 +77,11 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 
 
 
-	// Immediate to accumulator add
-	if ((buffer[byte]) >> 1 == 0b10) {
+	// Immediate to accumulator add/sub/cmp
+	if ((buffer[byte]) >> 1 == 0b10 || (buffer[byte]) >> 1 == 0b10110) {
+		char* operation;
+		if ((buffer[byte]) >> 1 == 0b10) operation = "add";
+		if ((buffer[byte]) >> 1 == 0b10110) operation = "sub";
 		wordByteFlag = buffer[byte] & 0b00000001;
 		int strShift;
 		strShift = wordByteFlag ? 0 : 8;
@@ -90,12 +93,12 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 			instructionLength = 3;
 			data16 = buffer[byte+1] + (buffer[byte+2] << 8);
 		}
-		fprintf(file, "add %s, %d\n", regStr[0+strShift], data16);
+		fprintf(file, "%s %s, %d\n", operation, regStr[0+strShift], data16);
 	}
 
 
 
-	// Immediate to register/memory add
+	// Immediate to register/memory add/sub/cmp
 	if ((buffer[byte] & 0b11111100) >> 2 == 0b100000) {
 
 		/* 	SW Table
@@ -111,11 +114,23 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 		regMem = (buffer[byte+1] & 0b00000111);
 		wordByteFlag = (buffer[byte] & 0b00000001);
 
+		char* operation;
+		switch (reg) {
+			case 0b000: operation = "add"; break;
+			case 0b101: operation = "sub"; break;
+			case 0b111: operation = "cmp"; break;
+		}
+
 		switch (mode) {
 			case MODE_MEM_NO_DISP:
-				instructionLength = 3;
+				if (wordByteFlag == BYTE) {
+					instructionLength = 3;
+				} else if (wordByteFlag == WORD) {
+					instructionLength = 3;
+				}
 				dataLow = buffer[byte+2];
-				fprintf(file, "add %s [%s], %d\n", wordByteFlag ? "word" : "byte", effAddrStr[regMem], dataLow);
+				// HERE IS THE PROBLEM WITH CMP
+				fprintf(file, "%s %s [%s], %d\n", operation, wordByteFlag ? "word" : "byte", effAddrStr[regMem], dataLow);
 				break;
 			case MODE_MEM_8_DISP:
 				dispLo = buffer[byte+2];
@@ -129,21 +144,21 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 				dataLow = buffer[byte+4];
 				instructionLength = 5;
 				u16 disp = (dispHi << 8) + dispLo;
-				fprintf(file, "add %s [%s + %d], %d\n", wordByteFlag ? "word" : "byte", effAddrStr[regMem], disp, dataLow);
+				fprintf(file, "%s %s [%s + %d], %d\n", operation, wordByteFlag ? "word" : "byte", effAddrStr[regMem], disp, dataLow);
 				break;
 			case MODE_REG:
 				instructionLength = 3;
 				dataLow = buffer[byte+2];
 				u16 data16 = (dataHigh << 8) + dataLow;
-				fprintf(file, "add %s, %d\n", wordByteFlag ? regStr[regMem] : regStr[regMem+8], data16);
+				fprintf(file, "%s %s, %d\n", operation, wordByteFlag ? regStr[regMem] : regStr[regMem+8], data16);
 				break;
 		}
 	}
 
 
 
-	// Register/memory to register/memory move/add
-	if ((buffer[byte] & 0b11111100) >> 2 == 0b100010 || (buffer[byte] & 0b11111100) >> 2 == 0b000000) {
+	// Register/memory to register/memory move/add/sub
+	if ((buffer[byte] & 0b11111100) >> 2 == 0b100010 || (buffer[byte] & 0b11111100) >> 2 == 0b000000 || (buffer[byte] & 0b11111100) >> 2 == 0b001010 || (buffer[byte] & 0b11111100) >> 2 == 0b1110) {
 
 		opcode = buffer[byte] >> 2;
 		directionFlag = (buffer[byte] & 0b00000010) >> 1;
@@ -151,6 +166,8 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 		mode = (buffer[byte+1] & 0b11000000) >> 6;
 		reg = (buffer[byte+1] & 0b00111000) >> 3;
 		regMem = (buffer[byte+1] & 0b00000111);
+		dispLo = 0;
+		dispHi = 0;
 		switch (mode) {
 			case MODE_MEM_NO_DISP:
 				instructionLength = 2;
@@ -170,8 +187,12 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 		}
 
 		char* operation;
-		if (opcode == 0b100010) operation = "mov"; 
-		if (opcode == 0b000000) operation = "add"; 
+		switch (opcode) {
+			case 0b100010: operation = "mov"; break;
+			case 0b000000: operation = "add"; break;
+			case 0b001010: operation = "sub"; break;
+			case 0b1110: operation = "cmp"; break;
+		}
 		int strShift = wordByteFlag ? 0 : 8;
 		switch (mode) {
 			case MODE_MEM_NO_DISP:
@@ -195,7 +216,7 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 				switch (directionFlag) {
 					case REG_SOURCE:
 						if (disp) {
-							fprintf(file, "%s %s, [%s + %d]\n", operation, regStr[reg+strShift], effAddrStr[regMem], disp);
+							fprintf(file, "%s [%s + %d], %s\n", operation, effAddrStr[regMem], disp, regStr[reg]);
 						} else {
 							fprintf(file, "%s [%s], %s\n", operation, effAddrStr[regMem], regStr[reg+strShift]);
 						}
@@ -305,4 +326,3 @@ int main(int argc, char* argv[]) {
 	fclose(ASMOutputFile);
 
 }
-
