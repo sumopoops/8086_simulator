@@ -123,14 +123,17 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 
 		switch (mode) {
 			case MODE_MEM_NO_DISP:
-				if (wordByteFlag == BYTE) {
-					instructionLength = 3;
-				} else if (wordByteFlag == WORD) {
-					instructionLength = 3;
-				}
 				dataLow = buffer[byte+2];
 				// HERE IS THE PROBLEM WITH CMP
-				fprintf(file, "%s %s [%s], %d\n", operation, wordByteFlag ? "word" : "byte", effAddrStr[regMem], dataLow);
+				if (regMem == 0b110) {
+					instructionLength = 5;
+					u16 disp = buffer[byte+2] + (buffer[byte+3] << 8);
+					dataLow = buffer[byte+4];
+					fprintf(file, "%s %s [%d], %d\n", operation, wordByteFlag ? "word" : "byte", disp, dataLow);
+				} else {
+					instructionLength = 3;
+					fprintf(file, "%s %s [%s], %d\n", operation, wordByteFlag ? "word" : "byte", effAddrStr[regMem], dataLow);
+				}
 				break;
 			case MODE_MEM_8_DISP:
 				dispLo = buffer[byte+2];
