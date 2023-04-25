@@ -78,10 +78,11 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 
 
 	// Immediate to accumulator add/sub/cmp
-	if ((buffer[byte]) >> 1 == 0b10 || (buffer[byte]) >> 1 == 0b10110) {
+	if ((buffer[byte]) >> 1 == 0b10 || (buffer[byte]) >> 1 == 0b10110 || (buffer[byte]) >> 1 == 0b0011110) {
 		char* operation;
 		if ((buffer[byte]) >> 1 == 0b10) operation = "add";
 		if ((buffer[byte]) >> 1 == 0b10110) operation = "sub";
+		if ((buffer[byte]) >> 1 == 0b0011110) operation = "cmp";
 		wordByteFlag = buffer[byte] & 0b00000001;
 		int strShift;
 		strShift = wordByteFlag ? 0 : 8;
