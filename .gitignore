@@ -1,6 +1,7 @@
 data/
 tests/
 8086_manual.pdf
+8086_family_manual.pdf
 8086_decode.exe
 8086_sim.exe
 build_and_run.bat

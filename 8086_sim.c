@@ -102,13 +102,6 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 	// Immediate to register/memory add/sub/cmp
 	if ((buffer[byte] & 0b11111100) >> 2 == 0b100000) {
 
-		/* 	SW Table
-			00 - 8 bit data
-			01 - 16 Bit data
-			10 - 8 bit data
-			11 - 8 bit converted to 16bits
-		*/
-
 		SWbits = (buffer[byte] & 0b00000011);
 		mode = (buffer[byte+1] & 0b11000000) >> 6;
 		reg = (buffer[byte+1] & 0b00111000) >> 3;
@@ -245,6 +238,150 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 		}
 
 	}
+
+
+
+	// Jump on not equal/not zero
+	if (buffer[byte] == 0b01110101) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jnz ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on equal/zero
+	if (buffer[byte] == 0b01110100) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "je ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on less/not greater or equal
+	if (buffer[byte] == 0b01111100) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jl ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on less or equal/not greater
+	if (buffer[byte] == 0b01111110) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jle ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on below/not above or equal
+	if (buffer[byte] == 0b01110010) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jb ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on below or equal/not above
+	if (buffer[byte] == 0b01110110) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jbe ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on parity/parity equal
+	if (buffer[byte] == 0b01111010) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jp ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+	
+	// Jump on overflow
+	if (buffer[byte] == 0b01110000) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jo ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on sign
+	if (buffer[byte] == 0b01111000) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "js ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on not less/greater or equal
+	if (buffer[byte] == 0b01111101) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jnl ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on not less or equal/greater
+	if (buffer[byte] == 0b01111111) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jg ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on not below/above or equal
+	if (buffer[byte] == 0b01110011) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jnb ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on not below or equal/above
+	if (buffer[byte] == 0b01110111) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "ja ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on not par/par odd
+	if (buffer[byte] == 0b01111011) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jnp ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on not overflow
+	if (buffer[byte] == 0b01110001) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jno ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on not sign
+	if (buffer[byte] == 0b01111001) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jns ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Loop CX times
+	if (buffer[byte] == 0b11100010) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "loop ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Loop while zero/equal
+	if (buffer[byte] == 0b11100001) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "loopz ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Loop while not zero/equal
+	if (buffer[byte] == 0b11100000) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "loopnz ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+	// Jump on CX zero
+	if (buffer[byte] == 0b11100011) {
+		dispLo = buffer[byte+1];
+		fprintf(file, "jcxz ; %d\n", dispLo);
+		instructionLength = 2;
+	}
+
+
 
 	// Debug
 	if (debug) {
