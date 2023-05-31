@@ -9,15 +9,14 @@ typedef unsigned short u16;
 u8 opcode, directionFlag, wordByteFlag, mode, reg, regMem, dataLow, dataHigh, dispLo, dispHi, SWbits;
 
 // Registers
-u16 AX, BX, CX, DX;
-u8 SI, DI, BP, SP;
+u16 registers[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 // Register Strings
 u8* regStr[16] = {"ax\0", "cx\0", "dx\0", "bx\0", "sp\0", "bp\0", "si\0", "di\0", "al\0", "cl\0", "dl\0", "bl\0", "ah\0", "ch\0", "dh\0", "bh\0"};
-
 u8* effAddrStr[8] = {"bx + si\0", "bx + di\0", "bp + si\0", "bp + di\0", "si\0", "di\0", "bp\0", "bx"};
 
 // Enums
+enum registerNames {AX, CX, DX, BX, SP, BP, SI, DI};
 enum directions {REG_SOURCE, REG_DEST};
 enum wordByte {BYTE, WORD};
 enum modes {MODE_MEM_NO_DISP, MODE_MEM_8_DISP, MODE_MEM_16_DISP, MODE_REG};
@@ -71,6 +70,10 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 		}
 
 		u16 data16 = (dataHigh << 8) + dataLow;
+
+		// Add to register
+		registers[reg] = data16;
+
 		fprintf(file, "mov %s, %d\n", wordByteFlag ? regStr[reg] : regStr[reg+8], data16);
 
 	}
@@ -94,6 +97,7 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 			instructionLength = 3;
 			data16 = buffer[byte+1] + (buffer[byte+2] << 8);
 		}
+
 		fprintf(file, "%s %s, %d\n", operation, regStr[0+strShift], data16);
 	}
 
@@ -461,6 +465,12 @@ int main(int argc, char* argv[]) {
 			printf("\033[0m\n");
 			exit(1);
 		}
+	}
+
+	// Print final state of registers
+	printf("\nFINAL STATE OF REGISTERS\n\n");
+	for (int i=0; i<8; i++) {
+		printf("%s: 0x%04X  (%d)\n", regStr[i], registers[i], registers[i]);
 	}
 
 	// Close output file
