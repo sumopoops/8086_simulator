@@ -122,7 +122,6 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 		switch (mode) {
 			case MODE_MEM_NO_DISP:
 				dataLow = buffer[byte+2];
-				// HERE IS THE PROBLEM WITH CMP
 				if (regMem == 0b110) {
 					instructionLength = 5;
 					u16 disp = buffer[byte+2] + (buffer[byte+3] << 8);
@@ -234,9 +233,11 @@ int decodeInstructionBytes(u8 *buffer, int byte, FILE* file) {
 			case MODE_REG:
 				if (directionFlag == REG_SOURCE) {
 					fprintf(file, "%s %s, %s\n", operation, regStr[regMem+strShift], regStr[reg+strShift]);
+					registers[regMem] = registers[reg];
 				}
 				if (directionFlag == REG_DEST) {
 					fprintf(file, "%s %s, %s\n", operation, regStr[reg+strShift], regStr[regMem+strShift]);
+					registers[reg] = registers[regMem];
 				} 
 				break;
 		}
@@ -469,9 +470,14 @@ int main(int argc, char* argv[]) {
 
 	// Print final state of registers
 	printf("\nFINAL STATE OF REGISTERS\n\n");
-	for (int i=0; i<8; i++) {
-		printf("%s: 0x%04X  (%d)\n", regStr[i], registers[i], registers[i]);
-	}
+	printf("%s: 0x%04X  (%d)\n", regStr[0], registers[0], registers[0]);
+	printf("%s: 0x%04X  (%d)\n", regStr[3], registers[3], registers[3]);
+	printf("%s: 0x%04X  (%d)\n", regStr[1], registers[1], registers[1]);
+	printf("%s: 0x%04X  (%d)\n", regStr[2], registers[2], registers[2]);
+	printf("%s: 0x%04X  (%d)\n", regStr[4], registers[4], registers[4]);
+	printf("%s: 0x%04X  (%d)\n", regStr[5], registers[5], registers[5]);
+	printf("%s: 0x%04X  (%d)\n", regStr[6], registers[6], registers[6]);
+	printf("%s: 0x%04X  (%d)\n", regStr[7], registers[7], registers[7]);
 
 	// Close output file
 	fclose(ASMOutputFile);

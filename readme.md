@@ -6,7 +6,7 @@ Created to follow along with Performance-Aware Programming - [Computer, Enhance!
 
 ## Description
 
-The program is currently capable of decoding/simulating course challenges 37, 38, 39, 41, 43.
+The program is currently capable of decoding/simulating course challenges 37, 38, 39, 41, 43, 44.
 
 
 ## Usage
